@@ -21,42 +21,57 @@ volatile int captureQ = 0;
 volatile bool newI = false;
 volatile bool newQ = false;
 
-// We will use Pin Change Interrupts (PCINT) for Pins 9 and 10
-// These share the same vector (PCINT0)
-
 void setup() {
-  // ... Keep all your Timer 1 setup code here ...
+  pinMode(9, OUTPUT);          // I-Signal (OC1A)
+  pinMode(10, OUTPUT);         // Q-Signal (OC1B)
+  pinMode(LED_BUILTIN, OUTPUT); // Status LED
 
-  // Setup Pin Change Interrupts on PB1 (D9) and PB2 (D10)
-  PCICR  |= (1 << PCIE0);   // Enable PCINT0 group
-  PCMSK0 |= (1 << PCINT1) | (1 << PCINT2); // Enable mask for D9 and D10
+  // --- Timer 1 Configuration (450 Hz Quadrature) ---
+  TCCR1A = 0;
+  TCCR1B = 0;
+  TCNT1  = 0;
+  TCCR1B |= (1 << WGM13) | (1 << WGM12); // CTC Mode
+  TCCR1B |= (1 << CS11) | (1 << CS10);   // Prescaler 64
+  ICR1 = 277;                            // Top for 450Hz
+  OCR1A = 0;                             // I-Phase
+  OCR1B = 138;                           // Q-Phase (90 deg)
+  TCCR1A |= (1 << COM1A0) | (1 << COM1B0); // Hardware Toggle
+
+  // --- Interrupt Configuration ---
+  PCICR  |= (1 << PCIE0);   
+  PCMSK0 |= (1 << PCINT1) | (1 << PCINT2); 
   
   Serial.begin(115200);
+  while (!Serial);
+  Serial.println("Starting.");
 }
 
 ISR(PCINT0_vect) {
-  uint8_t pinState = PINB; // Read Port B state
+  uint8_t pinState = PINB; // Read Port B (Pins 8-13)
 
-  // Check Rising Edge on Pin 9 (I)
-  if (pinState & (1 << PINB1)) { 
-    captureI = analogRead(A0); 
+  // Sync LED_BUILTIN (Pin 13) with Pin 9 (I-Signal)
+  if (pinState & (1 << PINB1)) {
+    PORTB |= (1 << PORTB5);    // Set LED High
+    captureI = analogRead(A0); // Sample I
     newI = true;
+  } else {
+    PORTB &= ~(1 << PORTB5);   // Set LED Low
   }
   
   // Check Rising Edge on Pin 10 (Q)
   if (pinState & (1 << PINB2)) { 
-    captureQ = analogRead(A0); 
+    captureQ = analogRead(A0); // Sample Q
     newQ = true;
   }
 }
 
 void loop() {
   if (newI && newQ) {
-    // This is where you will implement Synchronous Demodulation
-    // For now, we just print the raw I/Q samples
+    // Restore the printout for the analog capture
     Serial.print("I:"); Serial.print(captureI);
     Serial.print(" Q:"); Serial.println(captureQ);
-    
+
+    // Reset flags for the next cycle
     newI = false;
     newQ = false;
   }
