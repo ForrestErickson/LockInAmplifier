@@ -17,10 +17,12 @@ Capture A2D on riseing edge of I and Q
 
 
 // --- Settings ---
-#define SERIAL_DECIMATION 20  // Higher decimation for better serial stability
+#define SERIAL_DECIMATION 25  
 
-volatile int I_Demod = 0;     // Rectified I
+volatile int I_Demod = 0;     
+volatile int Q_Demod = 0;     // Added Q-Demod
 volatile bool newData = false;
+volatile int sample = 0; 
 
 void setup() {
   pinMode(9, OUTPUT);          // I-Signal (OC1A)
@@ -31,33 +33,40 @@ void setup() {
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1  = 0;
-  TCCR1B |= (1 << WGM13) | (1 << WGM12); // CTC Mode
-  TCCR1B |= (1 << CS11) | (1 << CS10);   // Prescaler 64
-  ICR1 = 277;                            // Top for 450Hz
-  OCR1A = 0;                             // I-Phase
-  OCR1B = 138;                           // Q-Phase
+  TCCR1B |= (1 << WGM13) | (1 << WGM12); 
+  TCCR1B |= (1 << CS11) | (1 << CS10);   
+  ICR1 = 277;                            
+  OCR1A = 0;                             
+  OCR1B = 138;                           
   TCCR1A |= (1 << COM1A0) | (1 << COM1B0); 
 
   // --- Interrupt Configuration ---
   PCICR  |= (1 << PCIE0);   
-  PCMSK0 = (1 << PCINT1);   // ONLY listen to Pin 9 (I-Signal)
+  // Mask for both Pin 9 (PCINT1) and Pin 10 (PCINT2)
+  PCMSK0 = (1 << PCINT1) | (1 << PCINT2); 
   
   Serial.begin(2000000);
   while (!Serial);
-  Serial.println("Starting.");
 }
 
 ISR(PCINT0_vect) {
   uint8_t pinState = PINB; 
-  int sample = analogRead(A0); 
+  sample = analogRead(A0); 
 
-  // Synchronous Rectification for I
+  // Synchronous Rectification for I (Pin 9)
   if (pinState & (1 << PINB1)) {
-    PORTB |= (1 << PORTB5);    // LED Sync
+    PORTB |= (1 << PORTB5);    // LED Sync with I
     I_Demod = sample; 
   } else {
     PORTB &= ~(1 << PORTB5);
     I_Demod = -sample;
+  }
+
+  // Synchronous Rectification for Q (Pin 10)
+  if (pinState & (1 << PINB2)) {
+    Q_Demod = sample;
+  } else {
+    Q_Demod = -sample;
   }
   
   newData = true;
@@ -67,15 +76,21 @@ void loop() {
   static int decimationCounter = 0; 
 
   if (newData) {
-    newData = false; // Reset flag
+    newData = false; 
 
     if (++decimationCounter >= SERIAL_DECIMATION) {
-      // Local copy of the 2-byte integer to avoid corruption
-      int plotValue = I_Demod;
+      // Local copies to maintain data integrity during print
+      int plotI = I_Demod;
+      int plotQ = Q_Demod;
+      int plotSample = sample;
 
       // Plotter Output
-      Serial.print("Min:-1023,Max:1023,I_Demod:");
-      Serial.println(plotValue);
+      Serial.print("Min:-1023,Max:1023,Sample:");
+      Serial.print(plotSample);     
+      Serial.print(",I:");
+      Serial.print(plotI);
+      Serial.print(",Q:");
+      Serial.println(plotQ);
       
       decimationCounter = 0; 
     }
