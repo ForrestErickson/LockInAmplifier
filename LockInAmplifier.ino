@@ -16,6 +16,9 @@ Capture A2D on riseing edge of I and Q
 */
 
 
+// --- Compile-Time Settings ---
+#define SERIAL_DECIMATION 10  // Set to 1 for all samples, 10 for every 10th, etc.
+
 volatile int captureI = 0;
 volatile int captureQ = 0;
 volatile bool newI = false;
@@ -30,18 +33,25 @@ void setup() {
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1  = 0;
-  TCCR1B |= (1 << WGM13) | (1 << WGM12); // CTC Mode
-  TCCR1B |= (1 << CS11) | (1 << CS10);   // Prescaler 64
+  
+  // Set WGM mode 12: CTC (Clear Timer on Compare Match) with ICR1 as TOP
+  TCCR1B |= (1 << WGM13) | (1 << WGM12); 
+  
+  // Set Prescaler to 64
+  TCCR1B |= (1 << CS11) | (1 << CS10);   
+  
   ICR1 = 277;                            // Top for 450Hz
   OCR1A = 0;                             // I-Phase
   OCR1B = 138;                           // Q-Phase (90 deg)
+  
+  // Enable "Toggle on Compare Match" for both Pins 9 and 10
   TCCR1A |= (1 << COM1A0) | (1 << COM1B0); // Hardware Toggle
 
   // --- Interrupt Configuration ---
-  PCICR  |= (1 << PCIE0);   
-  PCMSK0 |= (1 << PCINT1) | (1 << PCINT2); 
+  PCICR  |= (1 << PCIE0);   // Enable PCINT0 group
+  PCMSK0 |= (1 << PCINT1) | (1 << PCINT2); // Enable mask for D9 and D10
   
-  //Serial.begin(115200);
+  // Update Baud Rate to 2,000,000 for high-speed plotting
   Serial.begin(2000000);
   while (!Serial);
   Serial.println("Starting.");
@@ -67,12 +77,28 @@ ISR(PCINT0_vect) {
 }
 
 void loop() {
-  if (newI && newQ) {
-    // Restore the printout for the analog capture
-    Serial.print("I:"); Serial.print(captureI);
-    Serial.print(" Q:"); Serial.println(captureQ);
+  static int decimationCounter = 0; 
 
-    // Reset flags for the next cycle
+  if (newI && newQ) {
+    if (++decimationCounter >= SERIAL_DECIMATION) {
+      // Scale markers to lock Serial Plotter range
+      Serial.print("Zero:");
+      Serial.print(0);
+      Serial.print(",");
+      Serial.print("MAX:");
+      Serial.print(1023);
+      Serial.print(",");
+      
+      // Data signals
+      Serial.print("I_Capture:");
+      Serial.print(captureI);
+      Serial.print(",");
+      Serial.print("Q_Capture:");
+      Serial.println(captureQ);
+      
+      decimationCounter = 0; 
+    }
+
     newI = false;
     newQ = false;
   }
