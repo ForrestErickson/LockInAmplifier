@@ -41,7 +41,8 @@ void setup() {
   PCICR  |= (1 << PCIE0);   
   PCMSK0 |= (1 << PCINT1) | (1 << PCINT2); 
   
-  Serial.begin(115200);
+  //Serial.begin(115200);
+  Serial.begin(2000000);
   while (!Serial);
   Serial.println("Starting.");
 }
