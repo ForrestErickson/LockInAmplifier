@@ -16,90 +16,68 @@ Capture A2D on riseing edge of I and Q
 */
 
 
-// --- Compile-Time Settings ---
-#define SERIAL_DECIMATION 10  // Set to 1 for all samples, 10 for every 10th, etc.
+// --- Settings ---
+#define SERIAL_DECIMATION 20  // Higher decimation for better serial stability
 
-volatile int captureI = 0;
-volatile int captureQ = 0;
-volatile bool newI = false;
-volatile bool newQ = false;
+volatile int I_Demod = 0;     // Rectified I
+volatile bool newData = false;
 
 void setup() {
   pinMode(9, OUTPUT);          // I-Signal (OC1A)
   pinMode(10, OUTPUT);         // Q-Signal (OC1B)
-  pinMode(LED_BUILTIN, OUTPUT); // Status LED
+  pinMode(LED_BUILTIN, OUTPUT); 
 
-  // --- Timer 1 Configuration (450 Hz Quadrature) ---
+  // --- Timer 1 Configuration (450 Hz) ---
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1  = 0;
-  
-  // Set WGM mode 12: CTC (Clear Timer on Compare Match) with ICR1 as TOP
-  TCCR1B |= (1 << WGM13) | (1 << WGM12); 
-  
-  // Set Prescaler to 64
-  TCCR1B |= (1 << CS11) | (1 << CS10);   
-  
+  TCCR1B |= (1 << WGM13) | (1 << WGM12); // CTC Mode
+  TCCR1B |= (1 << CS11) | (1 << CS10);   // Prescaler 64
   ICR1 = 277;                            // Top for 450Hz
   OCR1A = 0;                             // I-Phase
-  OCR1B = 138;                           // Q-Phase (90 deg)
-  
-  // Enable "Toggle on Compare Match" for both Pins 9 and 10
-  TCCR1A |= (1 << COM1A0) | (1 << COM1B0); // Hardware Toggle
+  OCR1B = 138;                           // Q-Phase
+  TCCR1A |= (1 << COM1A0) | (1 << COM1B0); 
 
   // --- Interrupt Configuration ---
-  PCICR  |= (1 << PCIE0);   // Enable PCINT0 group
-  PCMSK0 |= (1 << PCINT1) | (1 << PCINT2); // Enable mask for D9 and D10
+  PCICR  |= (1 << PCIE0);   
+  PCMSK0 = (1 << PCINT1);   // ONLY listen to Pin 9 (I-Signal)
   
-  // Update Baud Rate to 2,000,000 for high-speed plotting
   Serial.begin(2000000);
   while (!Serial);
   Serial.println("Starting.");
 }
 
 ISR(PCINT0_vect) {
-  uint8_t pinState = PINB; // Read Port B (Pins 8-13)
+  uint8_t pinState = PINB; 
+  int sample = analogRead(A0); 
 
-  // Sync LED_BUILTIN (Pin 13) with Pin 9 (I-Signal)
+  // Synchronous Rectification for I
   if (pinState & (1 << PINB1)) {
-    PORTB |= (1 << PORTB5);    // Set LED High
-    captureI = analogRead(A0); // Sample I
-    newI = true;
+    PORTB |= (1 << PORTB5);    // LED Sync
+    I_Demod = sample; 
   } else {
-    PORTB &= ~(1 << PORTB5);   // Set LED Low
+    PORTB &= ~(1 << PORTB5);
+    I_Demod = -sample;
   }
   
-  // Check Rising Edge on Pin 10 (Q)
-  if (pinState & (1 << PINB2)) { 
-    captureQ = analogRead(A0); // Sample Q
-    newQ = true;
-  }
+  newData = true;
 }
 
 void loop() {
   static int decimationCounter = 0; 
 
-  if (newI && newQ) {
+  if (newData) {
+    newData = false; // Reset flag
+
     if (++decimationCounter >= SERIAL_DECIMATION) {
-      // Scale markers to lock Serial Plotter range
-      Serial.print("Zero:");
-      Serial.print(0);
-      Serial.print(",");
-      Serial.print("MAX:");
-      Serial.print(1023);
-      Serial.print(",");
-      
-      // Data signals
-      Serial.print("I_Capture:");
-      Serial.print(captureI);
-      Serial.print(",");
-      Serial.print("Q_Capture:");
-      Serial.println(captureQ);
+      // Local copy of the 2-byte integer to avoid corruption
+      int plotValue = I_Demod;
+
+      // Plotter Output
+      Serial.print("Min:-1023,Max:1023,I_Demod:");
+      Serial.println(plotValue);
       
       decimationCounter = 0; 
     }
-
-    newI = false;
-    newQ = false;
   }
 }
