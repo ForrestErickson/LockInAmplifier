@@ -17,15 +17,9 @@ Capture A2D on riseing edge of I and Q
 
 
 // --- Settings ---
-#define SERIAL_DECIMATION 25  
-#define FILTER_SHIFT 4        // Higher = smoother/slower. 4 is a good start.
+#define SERIAL_DECIMATION 100 // High decimation to give Serial hardware "breathing room"
+#define FILTER_SHIFT 6        // Smooths out the 30Hz beat from 60Hz noise
 
-volatile int I_Demod = 0;     
-volatile int Q_Demod = 0;     
-volatile bool newData = false;
-volatile int rawSample = 0; 
-
-// Filter variables (Longs to prevent overflow during intermediate math)
 long I_Filtered = 0;
 long Q_Filtered = 0;
 
@@ -34,7 +28,7 @@ void setup() {
   pinMode(10, OUTPUT);         
   pinMode(LED_BUILTIN, OUTPUT); 
 
-  // --- Timer 1 Configuration (450 Hz) ---
+  // --- Timer 1 (450 Hz Quadrature) ---
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1  = 0;
@@ -45,51 +39,44 @@ void setup() {
   OCR1B = 138;                           
   TCCR1A |= (1 << COM1A0) | (1 << COM1B0); 
 
-  PCICR  |= (1 << PCIE0);   
-  PCMSK0 = (1 << PCINT1) | (1 << PCINT2); 
+  // NO INTERRUPTS - We will poll the hardware pins directly for max stability
   
   Serial.begin(2000000);
   while (!Serial);
 }
 
-ISR(PCINT0_vect) {
-  uint8_t pinState = PINB; 
-  int s = analogRead(A0); 
-  rawSample = s;
-
-  // Synchronous Rectification
-  I_Demod = (pinState & (1 << PINB1)) ? s : -s;
-  Q_Demod = (pinState & (1 << PINB2)) ? s : -s;
-  
-  // LED Sync with I
-  if (pinState & (1 << PINB1)) PORTB |= (1 << PORTB5);
-  else PORTB &= ~(1 << PORTB5);
-
-  newData = true;
-}
-
 void loop() {
-  static int decimationCounter = 0; 
+  static int decimationCounter = 0;
+  static uint8_t lastPinState = 0;
 
-  if (newData) {
-    newData = false; 
+  // Poll the hardware pins (Port B) for any change
+  uint8_t currentPinState = PINB;
 
-    // --- Exponential Moving Average (EMA) Filter ---
-    // We scale by 2^8 (256) internally to maintain precision without floats
-    I_Filtered = I_Filtered + (((long)I_Demod * 256 - I_Filtered) >> FILTER_SHIFT);
-    Q_Filtered = Q_Filtered + (((long)Q_Demod * 256 - Q_Filtered) >> FILTER_SHIFT);
+  // If Pin 9 or Pin 10 has changed state...
+  if ((currentPinState ^ lastPinState) & ( (1 << PINB1) | (1 << PINB2) )) {
+    lastPinState = currentPinState;
 
+    // Determine current phases
+    int i_phase = (currentPinState & (1 << PINB1)) ? 1 : -1;
+    int q_phase = (currentPinState & (1 << PINB2)) ? 1 : -1;
+
+    // Sync LED to I-phase
+    if (i_phase == 1) PORTB |= (1 << PORTB5);
+    else PORTB &= ~(1 << PORTB5);
+
+    // Sample and Rectify
+    int s = analogRead(A0); 
+    
+    // EMA Filter with 8-bit internal precision
+    I_Filtered += (((long)s * i_phase * 256) - I_Filtered) >> FILTER_SHIFT;
+    Q_Filtered += (((long)s * q_phase * 256) - Q_Filtered) >> FILTER_SHIFT;
+
+    // Decimated Output
     if (++decimationCounter >= SERIAL_DECIMATION) {
-      // Scale back down for plotting
-      int plotI = I_Filtered / 256;
-      int plotQ = Q_Filtered / 256;
-
-      Serial.print("Min:-1023,Max:1023,Raw:");
-      Serial.print(rawSample);     
-      Serial.print(",I_Filt:");
-      Serial.print(plotI);
-      Serial.print(",Q_Filt:");
-      Serial.println(plotQ);
+      Serial.print("Min:-1023,Max:1023,I_F:");
+      Serial.print(I_Filtered / 256);
+      Serial.print(",Q_F:");
+      Serial.println(Q_Filtered / 256);
       
       decimationCounter = 0; 
     }
