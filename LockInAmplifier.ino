@@ -18,15 +18,20 @@ Capture A2D on riseing edge of I and Q
 
 // --- Settings ---
 #define SERIAL_DECIMATION 25  
+#define FILTER_SHIFT 4        // Higher = smoother/slower. 4 is a good start.
 
 volatile int I_Demod = 0;     
-volatile int Q_Demod = 0;     // Added Q-Demod
+volatile int Q_Demod = 0;     
 volatile bool newData = false;
-volatile int sample = 0; 
+volatile int rawSample = 0; 
+
+// Filter variables (Longs to prevent overflow during intermediate math)
+long I_Filtered = 0;
+long Q_Filtered = 0;
 
 void setup() {
-  pinMode(9, OUTPUT);          // I-Signal (OC1A)
-  pinMode(10, OUTPUT);         // Q-Signal (OC1B)
+  pinMode(9, OUTPUT);          
+  pinMode(10, OUTPUT);         
   pinMode(LED_BUILTIN, OUTPUT); 
 
   // --- Timer 1 Configuration (450 Hz) ---
@@ -40,9 +45,7 @@ void setup() {
   OCR1B = 138;                           
   TCCR1A |= (1 << COM1A0) | (1 << COM1B0); 
 
-  // --- Interrupt Configuration ---
   PCICR  |= (1 << PCIE0);   
-  // Mask for both Pin 9 (PCINT1) and Pin 10 (PCINT2)
   PCMSK0 = (1 << PCINT1) | (1 << PCINT2); 
   
   Serial.begin(2000000);
@@ -51,24 +54,17 @@ void setup() {
 
 ISR(PCINT0_vect) {
   uint8_t pinState = PINB; 
-  sample = analogRead(A0); 
+  int s = analogRead(A0); 
+  rawSample = s;
 
-  // Synchronous Rectification for I (Pin 9)
-  if (pinState & (1 << PINB1)) {
-    PORTB |= (1 << PORTB5);    // LED Sync with I
-    I_Demod = sample; 
-  } else {
-    PORTB &= ~(1 << PORTB5);
-    I_Demod = -sample;
-  }
-
-  // Synchronous Rectification for Q (Pin 10)
-  if (pinState & (1 << PINB2)) {
-    Q_Demod = sample;
-  } else {
-    Q_Demod = -sample;
-  }
+  // Synchronous Rectification
+  I_Demod = (pinState & (1 << PINB1)) ? s : -s;
+  Q_Demod = (pinState & (1 << PINB2)) ? s : -s;
   
+  // LED Sync with I
+  if (pinState & (1 << PINB1)) PORTB |= (1 << PORTB5);
+  else PORTB &= ~(1 << PORTB5);
+
   newData = true;
 }
 
@@ -78,18 +74,21 @@ void loop() {
   if (newData) {
     newData = false; 
 
-    if (++decimationCounter >= SERIAL_DECIMATION) {
-      // Local copies to maintain data integrity during print
-      int plotI = I_Demod;
-      int plotQ = Q_Demod;
-      int plotSample = sample;
+    // --- Exponential Moving Average (EMA) Filter ---
+    // We scale by 2^8 (256) internally to maintain precision without floats
+    I_Filtered = I_Filtered + (((long)I_Demod * 256 - I_Filtered) >> FILTER_SHIFT);
+    Q_Filtered = Q_Filtered + (((long)Q_Demod * 256 - Q_Filtered) >> FILTER_SHIFT);
 
-      // Plotter Output
-      Serial.print("Min:-1023,Max:1023,Sample:");
-      Serial.print(plotSample);     
-      Serial.print(",I:");
+    if (++decimationCounter >= SERIAL_DECIMATION) {
+      // Scale back down for plotting
+      int plotI = I_Filtered / 256;
+      int plotQ = Q_Filtered / 256;
+
+      Serial.print("Min:-1023,Max:1023,Raw:");
+      Serial.print(rawSample);     
+      Serial.print(",I_Filt:");
       Serial.print(plotI);
-      Serial.print(",Q:");
+      Serial.print(",Q_Filt:");
       Serial.println(plotQ);
       
       decimationCounter = 0; 
