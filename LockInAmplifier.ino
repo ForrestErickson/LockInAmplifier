@@ -16,66 +16,93 @@ Capture A2D on riseing edge of I and Q
 */
 
 
-#define SERIAL_DECIMATION 100 
-#define FILTER_SHIFT 6        
+#include <math.h>
 
-// Use 'long' for 32-bit precision to prevent overflow at 32,767
-long I_Filtered = 0;
-long Q_Filtered = 0;
+// --- Settings ---
+//#define SERIAL_DECIMATION 100 
+#define SERIAL_DECIMATION 10 
+#define FILTER_SHIFT 6        
+#define DC_TRACK_SHIFT 8     // Slow filter to track the 2.0V baseline
+
+// Filter and Tracking variables (32-bit long to prevent overflow)
+long I_Filt = 0;
+long Q_Filt = 0;
+long DC_Level = 512L * 256;  // Start at mid-scale (approx 2.5V)
 
 void setup() {
-  pinMode(9, OUTPUT);          
-  pinMode(10, OUTPUT);         
-  pinMode(LED_BUILTIN, OUTPUT); 
+  // Pin Setup
+  pinMode(9, OUTPUT);          // I-Signal (OC1A) - To LED Driver
+  pinMode(10, OUTPUT);         // Q-Signal (OC1B)
+  pinMode(LED_BUILTIN, OUTPUT); // Status LED
 
+  // --- Timer 1 Configuration (450 Hz Quadrature) ---
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1  = 0;
+  
+  // Set WGM mode 12: CTC (Clear Timer on Compare Match)
   TCCR1B |= (1 << WGM13) | (1 << WGM12); 
+  
+  // Set Prescaler to 64
   TCCR1B |= (1 << CS11) | (1 << CS10);   
-  ICR1 = 277;                            
-  OCR1A = 0;                             
-  OCR1B = 138;                           
+  
+  ICR1 = 277;                            // Top for 449.6 Hz
+  OCR1A = 0;                             // I-Phase Reference
+  OCR1B = 138;                           // Q-Phase Reference (90 deg)
+  
+  // Enable Hardware Toggle on Pins 9 and 10
   TCCR1A |= (1 << COM1A0) | (1 << COM1B0); 
 
+  // Initialize Serial
   Serial.begin(2000000);
   while (!Serial);
+  // Serial.println("Starting Stable Lock-In...");
 }
 
 void loop() {
   static int decimationCounter = 0;
   static uint8_t lastPinState = 0;
 
+  // Poll Port B (D8-D13) for clock transitions
   uint8_t currentPinState = PINB;
 
+  // Detect any edge on Pin 9 or Pin 10
   if ((currentPinState ^ lastPinState) & ((1 << PINB1) | (1 << PINB2))) {
     lastPinState = currentPinState;
 
-    long i_phase = (currentPinState & (1 << PINB1)) ? 1L : -1L;
-    long q_phase = (currentPinState & (1 << PINB2)) ? 1L : -1L;
+    // Determine current phases
+    long i_p = (currentPinState & (1 << PINB1)) ? 1L : -1L;
+    long q_p = (currentPinState & (1 << PINB2)) ? 1L : -1L;
 
-    if (i_phase == 1L) PORTB |= (1 << PORTB5);
+    // Sync Built-in LED to I-phase for visual verification
+    if (i_p == 1L) PORTB |= (1 << PORTB5);
     else PORTB &= ~(1 << PORTB5);
 
-    // Explicitly use long for the sample
-    long s = (long)analogRead(A0);  //Dummy read for stabilization.
-    s = (long)analogRead(A0); 
+    // Fast ADC Sample
+    long s_raw = (long)analogRead(A0); 
     
-    // EMA Filter: (Sample * Phase * Scale) - current_average
-    // Shifted by FILTER_SHIFT to update the moving average
-    I_Filtered += ((s * i_phase * 256L) - I_Filtered) >> FILTER_SHIFT;
-    Q_Filtered += ((s * q_phase * 256L) - Q_Filtered) >> FILTER_SHIFT;
+    // 1. DC TRACKING: Update ambient baseline estimate
+    DC_Level += ((s_raw * 256L) - DC_Level) >> DC_TRACK_SHIFT;
+    
+    // 2. DC REJECTION: Center the signal by subtracting the baseline
+    long s_ac = s_raw - (DC_Level >> 8);
 
+    // 3. DEMODULATION: Synchronous rectification of the centered signal
+    I_Filt += ((s_ac * i_p * 256L) - I_Filt) >> FILTER_SHIFT;
+    Q_Filt += ((s_ac * q_p * 256L) - Q_Filt) >> FILTER_SHIFT;
+
+    // 4. PLOTTING: Decimate output to keep Serial buffer clear
     if (++decimationCounter >= SERIAL_DECIMATION) {
-      // Print using fixed-length labels to save bytes
-      // Serial.print("m:-1023,M:1023,I:");
-      // Serial.print(I_Filtered / 256L);
-      // Serial.print(",Q:");
-      // Serial.println(Q_Filtered / 256L);
       
-      Serial.println(I_Filtered);
-      
+      // Calculate Vector Magnitude (Phase Independent Strength)
+      float I_val = (float)(I_Filt >> 8);
+      float Q_val = (float)(Q_Filt >> 8);
+      float Magnitude = sqrt(I_val * I_val + Q_val * Q_val);
 
+      // Serial Plotter output
+      Serial.print("m:0,M:1000,Mag:");
+      Serial.println((int)Magnitude);
+      
       decimationCounter = 0; 
     }
   }
