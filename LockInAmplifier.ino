@@ -58,7 +58,8 @@ void loop() {
     else PORTB &= ~(1 << PORTB5);
 
     // Explicitly use long for the sample
-    long s = (long)analogRead(A0); 
+    long s = (long)analogRead(A0);  //Dummy read for stabilization.
+    s = (long)analogRead(A0); 
     
     // EMA Filter: (Sample * Phase * Scale) - current_average
     // Shifted by FILTER_SHIFT to update the moving average
@@ -67,11 +68,14 @@ void loop() {
 
     if (++decimationCounter >= SERIAL_DECIMATION) {
       // Print using fixed-length labels to save bytes
-      Serial.print("m:-1023,M:1023,I:");
-      Serial.print(I_Filtered / 256L);
-      Serial.print(",Q:");
-      Serial.println(Q_Filtered / 256L);
+      // Serial.print("m:-1023,M:1023,I:");
+      // Serial.print(I_Filtered / 256L);
+      // Serial.print(",Q:");
+      // Serial.println(Q_Filtered / 256L);
       
+      Serial.println(I_Filtered);
+      
+
       decimationCounter = 0; 
     }
   }
