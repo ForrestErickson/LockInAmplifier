@@ -15,95 +15,85 @@ Capture A2D on riseing edge of I and Q
 
 */
 
-
 #include <math.h>
 
 // --- Settings ---
-//#define SERIAL_DECIMATION 100 
-#define SERIAL_DECIMATION 10 
-#define FILTER_SHIFT 6        
-#define DC_TRACK_SHIFT 8     // Slow filter to track the 2.0V baseline
+#define SERIAL_DECIMATION 200  // Higher value for total system stability
+float alpha = 0.05;            // Filter smoothness
+float dc_alpha = 0.01;         // Ambient light tracking
 
-// Filter and Tracking variables (32-bit long to prevent overflow)
-long I_Filt = 0;
-long Q_Filt = 0;
-long DC_Level = 512L * 256;  // Start at mid-scale (approx 2.5V)
+// Filter variables as floats for "spike-proof" math
+float I_Filt = 0;
+float Q_Filt = 0;
+float DC_Level = 512.0; 
 
 void setup() {
   // Pin Setup
-  pinMode(9, OUTPUT);          // I-Signal (OC1A) - To LED Driver
-  pinMode(10, OUTPUT);         // Q-Signal (OC1B)
+  pinMode(9, OUTPUT);           // I-Signal (Reference)
+  pinMode(10, OUTPUT);          // Q-Signal
   pinMode(LED_BUILTIN, OUTPUT); // Status LED
 
-  // --- Timer 1 Configuration (450 Hz Quadrature) ---
+  // --- TIMER 1: Mode 12 (ICR1 as TOP) - The 9-hour stable mode ---
   TCCR1A = 0;
   TCCR1B = 0;
   TCNT1  = 0;
   
-  // Set WGM mode 12: CTC (Clear Timer on Compare Match)
+  // WGM 13 & 12 = Mode 12 (CTC with ICR1 as TOP)
   TCCR1B |= (1 << WGM13) | (1 << WGM12); 
   
-  // Set Prescaler to 64
+  // CS11 & CS10 = Prescaler 64
   TCCR1B |= (1 << CS11) | (1 << CS10);   
   
-  ICR1 = 277;                            // Top for 449.6 Hz
-  OCR1A = 0;                             // I-Phase Reference
-  OCR1B = 138;                           // Q-Phase Reference (90 deg)
+  ICR1 = 277;    // Frequency: 450 Hz
+  OCR1A = 0;     // Phase for Pin 9
+  OCR1B = 138;   // Phase for Pin 10 (90 deg)
   
-  // Enable Hardware Toggle on Pins 9 and 10
+  // Enable Hardware Toggle on Pins 9 & 10
   TCCR1A |= (1 << COM1A0) | (1 << COM1B0); 
 
-  // Initialize Serial
   Serial.begin(2000000);
   while (!Serial);
-  // Serial.println("Starting Stable Lock-In...");
 }
 
 void loop() {
   static int decimationCounter = 0;
   static uint8_t lastPinState = 0;
 
-  // Poll Port B (D8-D13) for clock transitions
+  // Poll hardware for reference clock edges
   uint8_t currentPinState = PINB;
 
-  // Detect any edge on Pin 9 or Pin 10
   if ((currentPinState ^ lastPinState) & ((1 << PINB1) | (1 << PINB2))) {
     lastPinState = currentPinState;
 
-    // Determine current phases
-    long i_p = (currentPinState & (1 << PINB1)) ? 1L : -1L;
-    long q_p = (currentPinState & (1 << PINB2)) ? 1L : -1L;
+    float i_p = (currentPinState & (1 << PINB1)) ? 1.0 : -1.0;
+    float q_p = (currentPinState & (1 << PINB2)) ? 1.0 : -1.0;
 
-    // Sync Built-in LED to I-phase for visual verification
-    if (i_p == 1L) PORTB |= (1 << PORTB5);
+    // Sync Built-in LED to Pin 9
+    if (i_p > 0) PORTB |= (1 << PORTB5);
     else PORTB &= ~(1 << PORTB5);
 
-    // Fast ADC Sample
-    long s_raw = (long)analogRead(A0); 
-    
-    // 1. DC TRACKING: Update ambient baseline estimate
-    DC_Level += ((s_raw * 256L) - DC_Level) >> DC_TRACK_SHIFT;
-    
-    // 2. DC REJECTION: Center the signal by subtracting the baseline
-    long s_ac = s_raw - (DC_Level >> 8);
+    // 1. Capture and DC Rejection
+    float s_raw = (float)analogRead(A0); 
+    DC_Level += (s_raw - DC_Level) * dc_alpha;
+    float s_ac = s_raw - DC_Level;
 
-    // 3. DEMODULATION: Synchronous rectification of the centered signal
-    I_Filt += ((s_ac * i_p * 256L) - I_Filt) >> FILTER_SHIFT;
-    Q_Filt += ((s_ac * q_p * 256L) - Q_Filt) >> FILTER_SHIFT;
+    // 2. Synchronous Demodulation
+    I_Filt += ((s_ac * i_p) - I_Filt) * alpha;
+    Q_Filt += ((s_ac * q_p) - Q_Filt) * alpha;
 
-    // 4. PLOTTING: Decimate output to keep Serial buffer clear
     if (++decimationCounter >= SERIAL_DECIMATION) {
+      // 3. Magnitude Calculation
+      float Mag = sqrt(I_Filt * I_Filt + Q_Filt * Q_Filt);
       
-      // Calculate Vector Magnitude (Phase Independent Strength)
-      float I_val = (float)(I_Filt >> 8);
-      float Q_val = (float)(Q_Filt >> 8);
-      float Magnitude = sqrt(I_val * I_val + Q_val * Q_val);
+      // 4. Noise Gate: If signal is negligible, force to 0
+      if (Mag < 1.5) Mag = 0;
 
-      // Serial Plotter output
-      Serial.print("m:0,M:1000,Mag:");
-      Serial.println((int)Magnitude);
+      // 5. Serial Plotter Output (Minimal labels for stability)
+      Serial.print("m:0,M:150,Mag:");
+      Serial.println(Mag);
       
       decimationCounter = 0; 
     }
   }
 }
+
