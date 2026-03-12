@@ -23,7 +23,17 @@ The Arduino IDE Serial Ploter allows time serise display of the resulting magnat
 First use is at 450Hz and half interger multipule of the 60Hz AC line in the USA.  
 This frequency produces imunity to 60Hz electric fields and ambiant light flicker.  
 
+### Bread Board, POC, (Proof Of Concept)
+[<img width="450" alt="image" src="https://github.com/user-attachments/assets/5f6860a9-4cd5-49c2-90ec-61bf86803aa9" />](<img width="600" alt="image" src="https://github.com/user-attachments/assets/5f6860a9-4cd5-49c2-90ec-61bf86803aa9" />)  
+Green wires are ground. Red are +5V and signals are yellow.
+
+### Waformes on POC
+[<img width="450" alt="image" src="https://github.com/user-attachments/assets/5f6860a9-4cd5-49c2-90ec-61bf86803aa9" />](<img width="600" alt="image" src="https://github.com/user-attachments/assets/5f6860a9-4cd5-49c2-90ec-61bf86803aa9" />)  
+Channel 1 is drive to the output LED. 2V/Div.  
+Channel 2 is the raw Vout at the Collector and Gain Set Resistor. 1V/Div.
+
+
 ### Example plot
-<img width="786" height="493" alt="image" src="https://github.com/user-attachments/assets/78afe0ec-d967-40c2-8332-7ec796a1db1a" />  
+[<img width="450" alt="image" src="https://github.com/user-attachments/assets/78afe0ec-d967-40c2-8332-7ec796a1db1a" />  ](<img width="786" height="493" alt="image" src="https://github.com/user-attachments/assets/78afe0ec-d967-40c2-8332-7ec796a1db1a" />  )  
 Image annoted with IrfanView
 
