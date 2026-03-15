@@ -1,0 +1,149 @@
+.~lock*
+.DS_Store
+*.gz
+*.vs
+*.vscode*
+__pycache__
+
+// Eagle PCB temp files
+*.b#*
+*.s#*
+
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+*-backups/
+
+# Org-mode
+.org-id-locations
+*_archive
+
+# flymake-mode
+*_flymake.*
+
+# eshell files
+/eshell/history
+/eshell/lastdir
+
+# elpa packages
+/elpa/
+
+# reftex files
+*.rel
+
+# AUCTeX auto folder
+/auto/
+
+# cask packages
+.cask/
+dist/
+
+# Flycheck
+flycheck_*.el
+
+# server auth directory
+/server/
+
+# projectiles files
+.projectile
+
+# directory configuration
+.dir-locals.el
+
+# network security
+/network-security.data
+
+
+# For FreeCAD projects
+
+# Back up file(s) for FreeCAD
+*.pyc
+*.fcstd1
+*.FCStd1
+*.fcstd2
+*.FCStd2
+*.FCBak
+Private
+
+
+# KiCad
+# Adapted from: https://github.com/github/gitignore/blob/master/KiCad.gitignore
+# For PCBs designed using KiCad: http://www.kicad-pcb.org/
+
+# Backup files
+# KiCad uses a ~ suffix for backups
+*~
+# Older versions might use the below format for backups
+/*-backups/
+
+# Autosave files
+# Introduced in KiCad 7
+.autosave
+
+# Project backup history folder (KiCad 7+)
+.history/
+
+# Output files
+# Excellon drill file
+*.drl
+# Gerber files
+*.gbr
+# Fabrication files
+*.fab
+# Netlist files
+*.net
+# Bill of Materials (BoM) files (can be generated in various formats)
+*.xml
+*.csv
+*.txt
+# Pick and place files
+*.pos
+*.pnp
+# KiCad simulation files
+*.cir
+*.log
+*.dat
+*.out
+*.raw
+*.sra
+*.st
+# 3D rendering caches
+*-cache.wrl
+*-cache.png
+
+# Lock files
+*.lck
+
+# DRC and ERC report files
+*.drc
+*.erc
+
+# Eeschema and Pcbnew session files
+*.ses
+
+# Local configuration files
+# These should generally not be shared across different developer setups
+fp-info-cache
+sym-info-cache
+kicad_pro.user
+kicad_wks.user
+
+# Mac OS temporary files
+.DS_Store
+
+# Windows temporary files
+Thumbs.db
+ehthumbs.db
+
+# Optional: sometimes these are wanted, sometimes not. Uncomment as needed.
+# Generated documentation files
+# *.pdf
+# PostScript files
+# *.ps
+# SVG plots
+# *.svg
