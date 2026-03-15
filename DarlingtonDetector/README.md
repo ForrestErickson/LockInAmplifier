@@ -15,7 +15,7 @@ Click the images below to open the interactive **KiCanvas** viewer for real-time
 
 | Schematic Preview | PCB Layout Preview |
 | :---: | :---: |
-| [![Schematic](https://github.com)](https://kicanvas.org/?repo=https%3A%2F%2Fgithub.com%2FForrestErickson%2FLockInAmplifier%2Fblob%2Fmain%2FDarlingtonDetector%2FDarlingtonDetector%2FDarlingtonDetector.kicad_sch) | [![PCB](https://github.com)](https://kicanvas.org) |
+| [![Schematic](https://github.com)](https://kicanvas.org/?repo=https%3A%2F%2Fgithub.com%2FForrestErickson%2FLockInAmplifier%2Fblob%2Fmain%2FDarlingtonDetector%2FDarlingtonDetector%2FDarlingtonDetector.kicad_sch) | [![PCB]()]([https://kicanvas.org](https://kicanvas.org/?repo=https%3A%2F%2Fgithub.com%2FForrestErickson%2FLockInAmplifier%2Fblob%2Fmain%2FDarlingtonDetector%2FDarlingtonDetector%2FDarlingtonDetector.kicad_pcb++)) |
 | *Click to view Schematic* | *Click to view PCB Layout* |
 
 
