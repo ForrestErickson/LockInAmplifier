@@ -26,7 +26,8 @@ Capture A2D on riseing edge of I and Q
 // --- CONFIGURATION ---
 #define TARGET_FREQ 450.0
 #define PRESCALER 64.0
-#define SERIAL_DECIMATION 200 
+//#define SERIAL_DECIMATION 200 
+#define SERIAL_DECIMATION 25 
 #define TIMER_CLOCK (16000000.0 / PRESCALER)
 
 // PWM Pins for LEDs (Timer 0)
@@ -78,10 +79,14 @@ ISR(TIMER1_COMPB_vect) {
   processSample(PINB & (1 << PINB2), 2); 
 }
 
+// --- Update this function to include the safety check ---
 void processSample(bool pinHigh, int phaseType) {
   float ref = pinHigh ? 1.0 : -1.0;
   float s_raw = (float)analogRead(A0);
   
+  // Constrain s_raw to valid ADC range to prevent extreme math spikes
+  s_raw = constrain(s_raw, 0, 1023);
+
   DC_Level += (s_raw - DC_Level) * dc_alpha;
   float s_ac = s_raw - DC_Level;
 
@@ -91,6 +96,11 @@ void processSample(bool pinHigh, int phaseType) {
   } else {
     Q_Filt += ((s_ac * ref) - Q_Filt) * alpha;
   }
+
+  // RECOVERY LOGIC: If a spike broke the math, reset filters to 0
+  if (isnan(I_Filt)) I_Filt = 0;
+  if (isnan(Q_Filt)) Q_Filt = 0;
+  if (isnan(DC_Level)) DC_Level = 512.0;
 }
 
 void loop() {
