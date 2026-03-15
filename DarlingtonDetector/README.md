@@ -7,3 +7,14 @@ See the PNP circuit in the lower left.
 
 KiCad Schematic Screen Shot  
 <img width="869" height="666" alt="Image" src="https://github.com/user-attachments/assets/38729d2a-07c2-4eeb-aee1-f4c6d6effbdd" />
+
+
+## 🔍 Interactive Design Exploration
+Click the images below to open the interactive **KiCanvas** viewer for real-time inspection of nets, layers, and components.
+
+
+| Schematic Preview | PCB Layout Preview |
+| :---: | :---: |
+| [![Schematic](https://github.com)](https://kicanvas.org) | [![PCB](https://github.com)](https://kicanvas.org) |
+| *Click to view Schematic* | *Click to view PCB Layout* |
+
