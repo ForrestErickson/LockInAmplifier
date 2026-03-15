@@ -33,10 +33,10 @@ The Proof Of Concept measured with oscilloscope.
 [<img width="450" alt="image" src="https://github.com/user-attachments/assets/a59b9095-55a2-4b8a-abb5-63332a55ae61" />  ](<img width="824" height="646" alt="image" src="https://github.com/user-attachments/assets/a59b9095-55a2-4b8a-abb5-63332a55ae61" />  )    
 Channel 1 is drive to the output LED. 2V/Div.  
 Channel 2 is the raw Vout at the Collector and Gain Set Resistor. 1V/Div.  
-The received signal, is a triangle wave because the load resistor is 10K and the capacitance of the Darlington transistor and stray capacitance of the solderless bread board and input to A0 form a low pass filter. This APE* circuit Darlington circuit was fast to fabricate from
+The received signal, is a triangle wave because the load resistor is 10K (later a 2K) and the capacitance of the Darlington transistor and stray capacitance of the solderless bread board and input to A0 form a low pass filter. This APE* circuit Darlington circuit was fast to fabricate from parts available on hand.
 
 
-### Example plot
+### Example Serial Plot
 Arduino IDE Serial Plot output.  
 [<img width="450" alt="image" src="https://github.com/user-attachments/assets/78afe0ec-d967-40c2-8332-7ec796a1db1a" />  ](<img width="786" height="493" alt="image" src="https://github.com/user-attachments/assets/78afe0ec-d967-40c2-8332-7ec796a1db1a" />  )  
 
@@ -47,4 +47,4 @@ Image annotated with IrfanView
 
 * *APE for Available Parts Engineering
 * Circuit inspiration from: https://wiki.analog.com/university/courses/electronics/electronics-lab-led-sensor#:~:text=As%20more%20photons%20hit%20the,a%20photodiode%20light%20sensor%20%2F%20detector.
-* 
+* [Irfanview](https://www.irfanview.com/)
